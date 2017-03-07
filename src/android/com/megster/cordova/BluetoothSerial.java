@@ -328,7 +328,6 @@ public class BluetoothSerial extends CordovaPlugin {
                     BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                     byte[] pinBytes = getPin();
                     device.setPin(pinBytes);
-                    device.setPairingConfirmation(true);
                 }
                 if (bondState == BluetoothDevice.BOND_BONDED)
                              callbackContext.success("PAIRED correctly");
