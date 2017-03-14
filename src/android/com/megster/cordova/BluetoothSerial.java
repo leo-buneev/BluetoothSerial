@@ -1,5 +1,8 @@
 package com.megster.cordova;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
+
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -11,13 +14,11 @@ import android.os.Handler;
 import android.os.Message;
 import android.provider.Settings;
 import android.util.Log;
-// kludgy imports to support 2.9 and 3.0 due to package changes
-import org.apache.cordova.*;
-// import org.apache.cordova.CordovaArgs;
-// import org.apache.cordova.CordovaPlugin;
-// import org.apache.cordova.CallbackContext;
-// import org.apache.cordova.PluginResult;
-// import org.apache.cordova.LOG;
+import org.apache.cordova.CordovaArgs;
+import org.apache.cordova.CordovaPlugin;
+import org.apache.cordova.CallbackContext;
+import org.apache.cordova.PluginResult;
+import org.apache.cordova.LOG;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -49,6 +50,10 @@ public class BluetoothSerial extends CordovaPlugin {
     private static final String SETTINGS = "showBluetoothSettings";
     private static final String ENABLE = "enable";
     private static final String DISCOVER_UNPAIRED = "discoverUnpaired";
+    private static final String SET_DEVICE_DISCOVERED_LISTENER = "setDeviceDiscoveredListener";
+    private static final String CLEAR_DEVICE_DISCOVERED_LISTENER = "clearDeviceDiscoveredListener";
+    private static final String SET_NAME = "setName";
+    private static final String SET_DISCOVERABLE = "setDiscoverable";
     private static final String PAIR = "pair";
     private static final String UNPAIR = "unpair";
 
@@ -57,6 +62,7 @@ public class BluetoothSerial extends CordovaPlugin {
     private CallbackContext dataAvailableCallback;
     private CallbackContext rawDataAvailableCallback;
     private CallbackContext enableBluetoothCallback;
+    private CallbackContext deviceDiscoveredCallback;
 
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothSerialService bluetoothSerialService;
@@ -81,6 +87,11 @@ public class BluetoothSerial extends CordovaPlugin {
     private String delimiter;
     private static final int REQUEST_ENABLE_BLUETOOTH = 1;
     private String PIN;  // If needed for pairing
+
+    // Android 23 requires user to explicitly grant permission for location to discover unpaired
+    private static final String ACCESS_COARSE_LOCATION = Manifest.permission.ACCESS_COARSE_LOCATION;
+    private static final int CHECK_PERMISSIONS_REQ_CODE = 2;
+    private CallbackContext permissionCallback;
 
     @Override
     public boolean execute(String action, CordovaArgs args, CallbackContext callbackContext) throws JSONException {
@@ -149,6 +160,10 @@ public class BluetoothSerial extends CordovaPlugin {
         } else if (action.equals(UNSUBSCRIBE)) {
 
             delimiter = null;
+
+            // send no result, so Cordova won't hold onto the data available callback anymore
+            PluginResult result = new PluginResult(PluginResult.Status.NO_RESULT);
+            dataAvailableCallback.sendPluginResult(result);
             dataAvailableCallback = null;
 
             callbackContext.success();
@@ -202,7 +217,33 @@ public class BluetoothSerial extends CordovaPlugin {
 
         } else if (action.equals(DISCOVER_UNPAIRED)) {
 
-            discoverUnpairedDevices(callbackContext);
+            if (cordova.hasPermission(ACCESS_COARSE_LOCATION)) {
+                discoverUnpairedDevices(callbackContext);
+            } else {
+                permissionCallback = callbackContext;
+                cordova.requestPermission(this, CHECK_PERMISSIONS_REQ_CODE, ACCESS_COARSE_LOCATION);
+            }
+
+        } else if (action.equals(SET_DEVICE_DISCOVERED_LISTENER)) {
+
+            this.deviceDiscoveredCallback = callbackContext;
+
+        } else if (action.equals(CLEAR_DEVICE_DISCOVERED_LISTENER)) {
+
+            this.deviceDiscoveredCallback = null;
+
+        } else if (action.equals(SET_NAME)) {
+
+            String newName = args.getString(0);
+            bluetoothAdapter.setName(newName);
+            callbackContext.success();
+
+        } else if (action.equals(SET_DISCOVERABLE)) {
+
+            int discoverableDuration = args.getInt(0);
+            Intent discoverIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
+            discoverIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, discoverableDuration);
+            cordova.getActivity().startActivity(discoverIntent);
 
         }
         else if (action.equals(PAIR)) {
@@ -260,6 +301,8 @@ public class BluetoothSerial extends CordovaPlugin {
 
     private void discoverUnpairedDevices(final CallbackContext callbackContext) throws JSONException {
 
+        final CallbackContext ddc = deviceDiscoveredCallback;
+
         final BroadcastReceiver discoverReceiver = new BroadcastReceiver() {
 
             private JSONArray unpairedDevices = new JSONArray();
@@ -269,7 +312,13 @@ public class BluetoothSerial extends CordovaPlugin {
                 if (BluetoothDevice.ACTION_FOUND.equals(action)) {
                     BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                     try {
-                        unpairedDevices.put(deviceToJSON(device));
+                    	JSONObject o = deviceToJSON(device);
+                        unpairedDevices.put(o);
+                        if (ddc != null) {
+                            PluginResult res = new PluginResult(PluginResult.Status.OK, o);
+                            res.setKeepCallback(true);
+                            ddc.sendPluginResult(res);
+                        }
                     } catch (JSONException e) {
                         // This shouldn't happen, log and ignore
                         Log.e(TAG, "Problem converting device to JSON", e);
@@ -487,5 +536,28 @@ public class BluetoothSerial extends CordovaPlugin {
             buffer.delete(0, index + c.length());
         }
         return data;
+    }
+
+    @Override
+    public void onRequestPermissionResult(int requestCode, String[] permissions,
+                                          int[] grantResults) throws JSONException {
+
+        for(int result:grantResults) {
+            if(result == PackageManager.PERMISSION_DENIED) {
+                LOG.d(TAG, "User *rejected* location permission");
+                this.permissionCallback.sendPluginResult(new PluginResult(
+                        PluginResult.Status.ERROR,
+                        "Location permission is required to discover unpaired devices.")
+                    );
+                return;
+            }
+        }
+
+        switch(requestCode) {
+            case CHECK_PERMISSIONS_REQ_CODE:
+                LOG.d(TAG, "User granted location permission");
+                discoverUnpairedDevices(permissionCallback);
+                break;
+        }
     }
 }

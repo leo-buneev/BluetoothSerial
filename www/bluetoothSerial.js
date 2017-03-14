@@ -81,7 +81,7 @@ module.exports = {
                 data = a.buffer;
             }
             success(data);
-        }
+        };
         cordova.exec(successWrapper, failure, "BluetoothSerial", "subscribeRaw", []);
     },
 
@@ -109,7 +109,26 @@ module.exports = {
     },
 
     discoverUnpaired: function (success, failure) {
-        cordova.exec(success, failure, "BluetoothSerial", "discoverUnpaired", []);        
+        cordova.exec(success, failure, "BluetoothSerial", "discoverUnpaired", []);
+    },
+
+    setDeviceDiscoveredListener: function (notify) {
+        if (typeof notify != 'function')
+            throw 'BluetoothSerial.setDeviceDiscoveredListener: Callback not a function';
+
+        cordova.exec(notify, null, "BluetoothSerial", "setDeviceDiscoveredListener", []);
+    },
+
+    clearDeviceDiscoveredListener: function () {
+        cordova.exec(null, null, "BluetoothSerial", "clearDeviceDiscoveredListener", []);
+    },
+
+    setName: function (newName) {
+        cordova.exec(null, null, "BluetoothSerial", "setName", [newName]);
+    },
+
+    setDiscoverable: function (discoverableDuration) {
+        cordova.exec(null, null, "BluetoothSerial", "setDiscoverable", [discoverableDuration]);
     },
 
     pair: function (macAddress, pin, success, failure) {
@@ -119,7 +138,6 @@ module.exports = {
     unpair: function (macAddress, success, failure) {
         cordova.exec(success, failure, "BluetoothSerial", "unpair", [macAddress]);
     }
-
 
 
 };
