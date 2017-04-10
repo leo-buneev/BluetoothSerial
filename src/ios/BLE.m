@@ -29,6 +29,7 @@ CBUUID *redBearLabsServiceUUID;
 CBUUID *adafruitServiceUUID;
 CBUUID *lairdServiceUUID;
 CBUUID *blueGigaServiceUUID;
+CBUUID *hm10ServiceUUID;
 CBUUID *serialServiceUUID;
 CBUUID *readCharacteristicUUID;
 CBUUID *writeCharacteristicUUID;
@@ -176,9 +177,10 @@ CBUUID *writeCharacteristicUUID;
         return;
     }
 
-    if ([serviceUUID isEqual:adafruitServiceUUID] || [serviceUUID isEqual:blueGigaServiceUUID]) {
+    if ((characteristic.properties & CBCharacteristicPropertyWrite) == CBCharacteristicPropertyWrite) {
         [p writeValue:data forCharacteristic:characteristic type:CBCharacteristicWriteWithResponse];
-    } else {
+    }
+    else if ((characteristic.properties & CBCharacteristicPropertyWriteWithoutResponse) == CBCharacteristicPropertyWriteWithoutResponse) {
         [p writeValue:data forCharacteristic:characteristic type:CBCharacteristicWriteWithoutResponse];
     }
 }
@@ -200,7 +202,7 @@ CBUUID *writeCharacteristicUUID;
     if (self.CM.state != CBCentralManagerStatePoweredOn)
     {
         NSLog(@"CoreBluetooth not correctly initialized !");
-        NSLog(@"State = %d (%s)\r\n", self.CM.state, [self centralManagerStateToString:self.CM.state]);
+        NSLog(@"State = %ld (%s)\r\n", (long)self.CM.state, [self centralManagerStateToString:self.CM.state]);
         return -1;
     }
 
@@ -211,7 +213,8 @@ CBUUID *writeCharacteristicUUID;
     adafruitServiceUUID = [CBUUID UUIDWithString:@ADAFRUIT_SERVICE_UUID];
     lairdServiceUUID = [CBUUID UUIDWithString:@LAIRD_SERVICE_UUID];
     blueGigaServiceUUID = [CBUUID UUIDWithString:@BLUEGIGA_SERVICE_UUID];
-    NSArray *services = @[redBearLabsServiceUUID, adafruitServiceUUID, lairdServiceUUID, blueGigaServiceUUID];
+    hm10ServiceUUID = [CBUUID UUIDWithString:@HM10_SERVICE_UUID];
+    NSArray *services = @[redBearLabsServiceUUID, adafruitServiceUUID, lairdServiceUUID, blueGigaServiceUUID, hm10ServiceUUID];
     [self.CM scanForPeripheralsWithServices:services options: nil];
 #else
     [self.CM scanForPeripheralsWithServices:nil options:nil]; // Start scanning
@@ -435,7 +438,7 @@ CBUUID *writeCharacteristicUUID;
 - (void)centralManagerDidUpdateState:(CBCentralManager *)central
 {
 #if TARGET_OS_IPHONE
-    NSLog(@"Status of CoreBluetooth central manager changed %d (%s)", central.state, [self centralManagerStateToString:central.state]);
+    NSLog(@"Status of CoreBluetooth central manager changed %ld (%s)", (long)central.state, [self centralManagerStateToString:central.state]);
 #else
     [self isLECapableHardware];
 #endif
@@ -450,7 +453,7 @@ CBUUID *writeCharacteristicUUID;
         for(int i = 0; i < self.peripherals.count; i++)
         {
             CBPeripheral *p = [self.peripherals objectAtIndex:i];
-            [p setAdvertisementData:advertisementData RSSI:RSSI];
+            [p bts_setAdvertisementData:advertisementData RSSI:RSSI];
 
             if ((p.identifier == NULL) || (peripheral.identifier == NULL))
                 continue;
@@ -547,6 +550,12 @@ static bool done = false;
                 serialServiceUUID = blueGigaServiceUUID;
                 readCharacteristicUUID = [CBUUID UUIDWithString:@BLUEGIGA_CHAR_TX_UUID];
                 writeCharacteristicUUID = [CBUUID UUIDWithString:@BLUEGIGA_CHAR_RX_UUID];
+                break;
+            } else if ([service.UUID isEqual:hm10ServiceUUID]) {
+                NSLog(@"HM-10 Bluetooth");
+                serialServiceUUID = hm10ServiceUUID;
+                readCharacteristicUUID = [CBUUID UUIDWithString:@HM10_CHAR_TX_UUID];
+                writeCharacteristicUUID = [CBUUID UUIDWithString:@HM10_CHAR_RX_UUID];
                 break;
             } else {
                 // ignore unknown services
