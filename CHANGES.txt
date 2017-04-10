@@ -1,3 +1,31 @@
+= 0.4.7 =
+Clear old data from buffer on new connection fixes #286
+Update package.json for Meteor #271 Thanks StephenClement
+Support HM-10 on iOS #288
+
+= 0.4.6 =
+Add support for Android 6.0 (API 23) Permissions. Thanks Sundypha #194, #226, #228
+
+= 0.4.5 =
+Resolve iOS conflicts with cordova-plugin-ble-central #177
+Add support for broadcasted name when discoverable (Android) #137 Thanks marvinmarnold
+Add a 'browser' target for emulated bluetooth #115 Thanks PhracturedBlue
+
+= 0.4.4 =
+Move plugin to NPM #160
+Support iOS 9 #154 #161 Thanks amplexdenmark
+Work with Adafruit nRF8001 and newer Bluefruit hardware #157 Thanks legege
+Drop support for Cordova 2.9
+
+= 0.4.3 =
+New API - Add device callback when scanning for unpaired Bluetooth devices. @shokre #119 #123
+Send NO_RESULT to subscribe callback when unsubscribing #121
+Fix bug in Chat example
+Fix write for Adafruit hardware (CBCharacteristicWriteWithoutResponse)
+
+= 0.4.2 =
+Fix typo in WP8 code
+
 = 0.4.1 =
 New APIs
 * showBluetoothSettings (Android & WP)
