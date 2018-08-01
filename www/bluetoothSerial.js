@@ -1,13 +1,13 @@
 /* global cordova */
 function createConnection(pluginName) {
   return {
-    connect: function(macAddress, success, failure) {
-      cordova.exec(success, failure, pluginName, 'connect', [macAddress])
+    connect: function(macAddress, portId, success, failure) {
+      cordova.exec(success, failure, pluginName, 'connect', [macAddress, portId])
     },
 
     // Android only - see http://goo.gl/1mFjZY
-    connectInsecure: function(macAddress, success, failure) {
-      cordova.exec(success, failure, pluginName, 'connectInsecure', [macAddress])
+    connectInsecure: function(macAddress, portId, success, failure) {
+      cordova.exec(success, failure, pluginName, 'connectInsecure', [macAddress, portId])
     },
 
     disconnect: function(success, failure) {
