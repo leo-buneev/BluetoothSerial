@@ -412,7 +412,12 @@ public class BluetoothSerial extends CordovaPlugin {
 
     private void connect(CordovaArgs args, boolean secure, CallbackContext callbackContext) throws JSONException {
         String macAddress = args.getString(0);
-        String portId = args.getString(1);
+        String portId = null
+	try {
+	    portId = args.getString(1)
+	} catch(JSONException e) {
+	    Log.d(TAG,"Didn't recieve port");
+	}
         BluetoothDevice device = bluetoothAdapter.getRemoteDevice(macAddress);
 
         if (device != null) {
