@@ -66,7 +66,7 @@
     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
 
     if (_bleShield.activePeripheral) {
-        if(_bleShield.activePeripheral.isConnected)
+        if(_bleShield.activePeripheral.state == CBPeripheralStateConnected)
         {
             [[_bleShield CM] cancelPeripheralConnection:[_bleShield activePeripheral]];
         }
@@ -169,7 +169,8 @@
 
 - (void)available:(CDVInvokedUrlCommand*)command {
     CDVPluginResult *pluginResult = nil;
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsInt:[_buffer length]];
+    // future versions could use messageAsNSInteger, but realistically, int is fine for buffer length
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsInt:(int)[_buffer length]];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
@@ -178,7 +179,7 @@
     NSString *message = @"";
 
     if ([_buffer length] > 0) {
-        int end = [_buffer length] - 1;
+        long end = [_buffer length] - 1;
         message = [_buffer substringToIndex:end];
         NSRange entireString = NSMakeRange(0, end);
         [_buffer deleteCharactersInRange:entireString];
@@ -199,9 +200,7 @@
 }
 
 - (void)clear:(CDVInvokedUrlCommand*)command {
-    int end = [_buffer length] - 1;
-    NSRange truncate = NSMakeRange(0, end);
-    [_buffer deleteCharactersInRange:truncate];
+    [self clearBuffer];
 }
 
 - (void)readRSSI:(CDVInvokedUrlCommand*)command {
@@ -245,6 +244,7 @@
 - (void)bleDidConnect {
     NSLog(@"bleDidConnect");
     CDVPluginResult *pluginResult = nil;
+    [self clearBuffer];
 
     if (_connectCallbackId) {
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
@@ -341,7 +341,7 @@
 
     if (range.location != NSNotFound) {
 
-        int end = range.location + range.length;
+        long end = range.location + range.length;
         message = [_buffer substringToIndex:end];
 
         NSRange truncate = NSMakeRange(0, end);
@@ -358,17 +358,9 @@
         NSMutableDictionary *peripheral = [NSMutableDictionary dictionary];
         CBPeripheral *p = [_bleShield.peripherals objectAtIndex:i];
 
-        if (p.UUID != NULL) {
-            // Seriously WTF?
-            CFStringRef s = CFUUIDCreateString(NULL, p.UUID);
-            NSString *uuid = [NSString stringWithCString:CFStringGetCStringPtr(s, 0)
-                                                encoding:(NSStringEncoding)NSUTF8StringEncoding];
-            [peripheral setObject: uuid forKey: @"uuid"];
-            [peripheral setObject: uuid forKey: @"id"];
-        }
-        else {
-            [peripheral setObject: @"" forKey: @"uuid"];
-        }
+        NSString *uuid = p.identifier.UUIDString;
+        [peripheral setObject: uuid forKey: @"uuid"];
+        [peripheral setObject: uuid forKey: @"id"];
 
         NSString *name = [p name];
         if (!name) {
@@ -376,7 +368,7 @@
         }
         [peripheral setObject: name forKey: @"name"];
 
-        NSNumber *rssi = [p advertisementRSSI];
+        NSNumber *rssi = [p btsAdvertisementRSSI];
         if (rssi) { // BLEShield doesn't provide advertised RSSI
             [peripheral setObject: rssi forKey:@"rssi"];
         }
@@ -411,7 +403,7 @@
 
     // disconnect
     if (_bleShield.activePeripheral) {
-        if(_bleShield.activePeripheral.isConnected)
+        if(_bleShield.activePeripheral.state == CBPeripheralStateConnected)
         {
             [[_bleShield CM] cancelPeripheralConnection:[_bleShield activePeripheral]];
             return;
@@ -468,6 +460,12 @@
         }
     }
     return peripheral;
+}
+
+- (void)clearBuffer {
+    long end = [_buffer length];
+    NSRange truncate = NSMakeRange(0, end);
+    [_buffer deleteCharactersInRange:truncate];
 }
 
 @end
